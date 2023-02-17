@@ -1,0 +1,16 @@
+{
+  "name": "email-and-social-media-scraper",
+  "version": "1.0.0",
+  "description": "scrape email address and social media from any domain",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ishfaq Ahmed",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^19.6.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz"
+  }
+}
