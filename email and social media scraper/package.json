@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "puppeteer": "^19.6.3",
+    "sheetjs-style": "^0.15.8",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.2/xlsx-0.19.2.tgz"
   }
 }
