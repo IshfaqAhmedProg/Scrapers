@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer';
 import * as XLSX from 'sheetjs-style';
 //User provided constants 
-const MAX_CHILD_NODES = 10;
+const MAX_CHILD_NODES = 2;
 const rootUrlsToScrape = [
     "https://www.scrapefox.vercel.app/",
     "https://bdswimmingpool.com/",
@@ -52,7 +52,23 @@ function styleHeader(headerArray, data) {
         })
     });
 }
+class DataMatch {
+    constructor(_regExp) {
+        this.regexp = _regExp;
+        this.matchArray = [];
+        this.extractedDataString = '';
+    }
 
+    getExtractedData(_data) {
+        this.matchArray = _data.matchAll(this.regexp);
+        for (const item of this.matchArray) {
+            if (this.extractedDataString.indexOf(item[0]) === -1)//prevent duplicates
+                this.extractedDataString = this.extractedDataString + (this.extractedDataString == "" ? "" : ",") + item[0]
+        }
+        return this.extractedDataString;
+    }
+
+}
 
 async function extractLinks(rootUrl, urlToScrape, linktype) {
     const browser = await puppeteer.launch({ headless: false, ignoreHTTPSErrors: true });
@@ -66,19 +82,8 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
     ]);
     const extractedData = {
         rootUrl: rootUrl,
-        url: '',
-        emails: '',
-        facebookLinks: '',
-        instagramLinks: '',
-        linkedInLinks: '',
+        url: urlToScrape,
     }
-    extractedData.url = urlToScrape;
-
-
-    const emailRegExp = new RegExp(/([A-z0-9_.+-]+@[A-z0-9_.-]+\.[A-z]+)/, 'g')
-    const facebookRegExp = new RegExp(/(?:https?:\/\/)?(?:www\.)?(mbasic.facebook|m\.facebook|facebook|fb)\.(com|me)\/(?:(?:\w\.)*#!\/)?(?:pages\/)?(?:[\w\-\.]*\/)*([\w\-\.]*)/, 'ig')
-    const linkedInRegExp = new RegExp(/(?:https?:)?\/\/(?:[\w]+\.)?linkedin\.com\/((company)|(school))\/([A-z0-9-À-ÿ\.]+)\/?/, 'g')
-    const instagramRegExp = new RegExp(/(?:https?:)?\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)/, 'g')
     //populate childlinks
     try {
         if (linktype != 'child') {
@@ -111,29 +116,73 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
     try {
         // console.log("childLinks", childLinks)
         const data = await page.evaluate(() => document.querySelector('*').outerHTML);
-
-        const emailMatch = data.matchAll(emailRegExp);
-        const facebookLinkMatch = data.matchAll(facebookRegExp);
-        const instagramLinkMatch = data.matchAll(instagramRegExp);
-        const linkedInLinkMatch = data.matchAll(linkedInRegExp);
-
+        const extractors = [
+            {
+                name: "emails",
+                dataMatch: new DataMatch(new RegExp(/([A-z0-9_.+-]+@[A-z0-9_.-]+\.[A-z]+)/, 'g'))
+            },
+            {
+                name: "facebookLinks",
+                dataMatch: new DataMatch(new RegExp(/(?:https?:\/\/)?(?:www\.)?(mbasic.facebook|m\.facebook|facebook|fb)\.(com|me)\/(?:(?:\w\.)*#!\/)?(?:pages\/)?(?:[\w\-\.]*\/)*([\w\-\.]*)/, 'ig'))
+            },
+            {
+                name: "instagramLinks",
+                dataMatch: new DataMatch(new RegExp(/(?:https?:)?\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)/, 'g'))
+            },
+            {
+                name: "linkedInLinks",
+                dataMatch: new DataMatch(new RegExp(/(?:https?:)?\/\/(?:[\w]+\.)?linkedin\.com\/((company)|(school))\/([A-z0-9-À-ÿ\.]+)\/?/, 'g'))
+            }
+        ]
+        extractors.forEach(extractor => {
+            extractedData[extractor.name] = extractor.dataMatch.getExtractedData(data);
+        });
+        // const email = new DataMatch(//Email matcher
+        //     new RegExp(/([A-z0-9_.+-]+@[A-z0-9_.-]+\.[A-z]+)/, 'g'),
+        //     data
+        // )
+        // extractedData.emails = email.getExtractedData();
+        // const facebookLinks = new DataMatch(//facebook matcher
+        //     new RegExp(/(?:https?:\/\/)?(?:www\.)?(mbasic.facebook|m\.facebook|facebook|fb)\.(com|me)\/(?:(?:\w\.)*#!\/)?(?:pages\/)?(?:[\w\-\.]*\/)*([\w\-\.]*)/, 'ig'),
+        //     data
+        // )
+        // extractedData.facebookLinks = facebookLinks.getExtractedData();
+        // const instagramLinks = new DataMatch(//instagram matcher
+        //     new RegExp(/(?:https?:)?\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)/, 'g'),
+        //     data
+        // )
+        // extractedData.instagramLinks = instagramLinks.getExtractedData();
+        // const linkedInLinks = new DataMatch(//linkedIn matcher
+        //     new RegExp(/(?:https?:)?\/\/(?:[\w]+\.)?linkedin\.com\/((company)|(school))\/([A-z0-9-À-ÿ\.]+)\/?/, 'g'),
+        //     data
+        // )
+        // extractedData.linkedInLinks = linkedInLinks.getExtractedData();
+        // const emailRegExp = new RegExp(/([A-z0-9_.+-]+@[A-z0-9_.-]+\.[A-z]+)/, 'g')
+        // const facebookRegExp = new RegExp(/(?:https?:\/\/)?(?:www\.)?(mbasic.facebook|m\.facebook|facebook|fb)\.(com|me)\/(?:(?:\w\.)*#!\/)?(?:pages\/)?(?:[\w\-\.]*\/)*([\w\-\.]*)/, 'ig')
+        // const linkedInRegExp = new RegExp(/(?:https?:)?\/\/(?:[\w]+\.)?linkedin\.com\/((company)|(school))\/([A-z0-9-À-ÿ\.]+)\/?/, 'g')
+        // const instagramRegExp = new RegExp(/(?:https?:)?\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)/, 'g')
+        // //phonenumbers youtube twitter
+        // const emailMatch = data.matchAll(emailRegExp);
+        // const facebookLinkMatch = data.matchAll(facebookRegExp);
+        // const instagramLinkMatch = data.matchAll(instagramRegExp);
+        // const linkedInLinkMatch = data.matchAll(linkedInRegExp);
+        // for (const facebookLink of facebookLinkMatch) {
+        //     if (extractedData.facebookLinks.indexOf(facebookLink[0]) === -1)//prevent duplicates
+        //         extractedData.facebookLinks = extractedData.facebookLinks + (extractedData.facebookLinks == "" ? "" : ",") + facebookLink[0]
+        //     }
+        // for (const email of emailMatch) {
+        //     if (extractedData.emails.indexOf(email[0]) === -1)//prevent duplicates
+        //         extractedData.emails = extractedData.emails + (extractedData.emails == "" ? "" : ",") + email[0]
+        //     }
+        // for (const instagramLink of instagramLinkMatch) {
+        //     if (extractedData.instagramLinks.indexOf(instagramLink[0]) === -1)//prevent duplicates
+        //     extractedData.instagramLinks = extractedData.instagramLinks + (extractedData.instagramLinks == "" ? "" : ",") + instagramLink[0]
+        // }
+        // for (const linkedInLink of linkedInLinkMatch) {
+        //     if (extractedData.linkedInLinks.indexOf(linkedInLink[0] === -1))//prevent duplicates
+        //     extractedData.linkedInLinks = extractedData.linkedInLinks + (extractedData.linkedInLinks == "" ? "" : ",") + linkedInLink[0]
+        // }
         await browser.close();
-        for (const facebookLink of facebookLinkMatch) {
-            if (extractedData.facebookLinks.indexOf(facebookLink[0]) === -1)//prevent duplicates
-                extractedData.facebookLinks = extractedData.facebookLinks + (extractedData.facebookLinks == "" ? "" : ",") + facebookLink[0]
-        }
-        for (const email of emailMatch) {
-            if (extractedData.emails.indexOf(email[0]) === -1)//prevent duplicates
-                extractedData.emails = extractedData.emails + (extractedData.emails == "" ? "" : ",") + email[0]
-        }
-        for (const instagramLink of instagramLinkMatch) {
-            if (extractedData.instagramLinks.indexOf(instagramLink[0]) === -1)//prevent duplicates
-                extractedData.instagramLinks = extractedData.instagramLinks + (extractedData.instagramLinks == "" ? "" : ",") + instagramLink[0]
-        }
-        for (const linkedInLink of linkedInLinkMatch) {
-            if (extractedData.linkedInLinks.indexOf(linkedInLink[0] === -1))//prevent duplicates
-                extractedData.linkedInLinks = extractedData.linkedInLinks + (extractedData.linkedInLinks == "" ? "" : ",") + linkedInLink[0]
-        }
 
     } catch (error) {
         console.log('The browser timedout!', error)
@@ -144,7 +193,9 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
     allData.push(Object.values(extractedData))
 
 }
+function processRawScrape() {
 
+}
 async function refineAllData() {
 
     const allDataWoHeader = allData.slice(1);//removing headers
