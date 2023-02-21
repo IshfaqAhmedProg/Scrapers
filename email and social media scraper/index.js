@@ -1,97 +1,147 @@
 import puppeteer from 'puppeteer';
 import * as XLSX from 'sheetjs-style';
+import { performance } from 'perf_hooks';
+import parsePhoneNumber from 'libphonenumber-js'
 //User provided constants 
-const MAX_CHILD_NODES = 1;
-const rootUrlsToScrape = [
-    "https://www.scrapefox.vercel.app/",
-    "https://bdswimmingpool.com/",
-    "https://www.nidirect.gov.uk/"
-
+const MAX_CHILD_NODES = 2;
+const ROOT_URLS_TO_SCRAPE = [
+    // "https://www.scrapefox.vercel.app/",
+    // "https://bdswimmingpool.com/",
+    // "https://www.nidirect.gov.uk/",
+    // "https://sblpools.com/",
+    "https://www.greenscenelandscape.com/",
+    "https://www.encorepoolsla.com/",
+    "https://www.executivepools.org/",
+    // "https://calimingo.com/",
+    // "https://californiapools.com/locations/",
+    // "https://custommojavepool.com/",
 ]
-
-//Initialising
-const allDataHeaderNames = [
-    'Root URL',
-    'Scraped URL',
-    'Emails',
-    'Facebook Links',
-    'Instagram Links',
-    'LinkedIn Links',
-]
-const refinedDataHeaderNames = [
-    "URL",
-    "Email",
-    "Other Emails Found",
-    "Facebook Link",
-    "Other Facebook Links",
-    "Instagram Link",
-    "Other Instagram Links",
-    "LinkedIn Link",
-    "Other LinkedIn Links",
-]
-const allData = [[]]
-const refinedData = [[]];
-
-var childLinks = [];
-
-//adding style to header values by add header Name to all Data object
-function styleHeader(headerArray, data) {
-    headerArray.forEach(header => {
-        data[0].push({
-            v: `${header}`, t: "s", s: {
-                font: { bold: true, color: { rgb: "FFFFFFFF" } },
-                fill: { fgColor: { rgb: "FF7B68EE" } },
-                border: {
-                    top: { style: "medium", color: { rgb: "FF7B68EE" } },
-                    bottom: { style: "medium", color: { rgb: "FF7B68EE" } },
-                    left: { style: "medium", color: { rgb: "FF7B68EE" } },
-                    right: { style: "medium", color: { rgb: "FF7B68EE" } }
-                },
-                alignment: { wrapText: true }
-            }
-        })
-    });
-}
 class DataMatch {
-    constructor(_name, _regExp) {
-        this.name = _name
+    constructor(_name, _displayName, _type, _regExp) {
+        this.name = _name;
+        this.type = _type;
+        this.displayName = _displayName;
         this.regexp = _regExp;
         this.matchArray = [];
         this.featureData = [];
-    }
-    static {
-        this.refinedData = [];
-        this.allDataArray = []
+        this.headers = { allData: _displayName, refinedData1: [_displayName, "Other " + _displayName + " Found"] };
     }
     getExtractedData(_data) {
-        var extractedDataString = '';
-        this.matchArray = _data.matchAll(this.regexp);
-        for (const item of this.matchArray) {
-            if (extractedDataString.indexOf(item[0]) === -1)//prevent duplicates
-                extractedDataString = extractedDataString + (extractedDataString == "" ? "" : ",") + item[0]
+        var extractedDataArray = [];
+
+        switch (this.type) {
+            case "allLinks":
+                {
+                    this.matchArray = _data;
+                    // console.log("phoneNumber", _data)
+                    this.matchArray.forEach((item) => {
+                        if (item.includes('tel:')) {
+                            const phoneNumber = parsePhoneNumber('+' + item.replace('tel:', '').replace('+', '').replace('-', ''))
+                            // console.log("phoneNumber found", item)
+                            if (phoneNumber) {
+                                extractedDataArray.push(phoneNumber.formatInternational());
+                            }
+                        }
+
+                    })
+                    return extractedDataArray;
+                    // console.log("phone number")
+                }
+                break;
+
+            case "allData":
+                {
+                    this.matchArray = _data.matchAll(this.regexp);
+                    // console.log("other", this.matchArray);
+                    for (const item of this.matchArray) {
+                        if (extractedDataArray.indexOf(item[0]) === -1)//prevent duplicates
+                        {
+                            extractedDataArray.push(item[0])
+                        }
+                    }
+                    return extractedDataArray;
+                }
+                break;
+            default:
+                break;
         }
-        return extractedDataString;
+    }
+    static {
+        this.refinedData = [[]];
+        this.allData = [[]];
+    }
+    static styleHeader(headerArray, data) {
+        headerArray.forEach(header => {
+            data[0].push({
+                v: `${header}`, t: "s", s: {
+                    font: { bold: true, color: { rgb: "FFFFFFFF" } },
+                    fill: { fgColor: { rgb: "FF7B68EE" } },
+                    border: {
+                        top: { style: "medium", color: { rgb: "FF7B68EE" } },
+                        bottom: { style: "medium", color: { rgb: "FF7B68EE" } },
+                        left: { style: "medium", color: { rgb: "FF7B68EE" } },
+                        right: { style: "medium", color: { rgb: "FF7B68EE" } }
+                    },
+                    alignment: { wrapText: true }
+                }
+            });
+        });
     }
 
+    static getAllDataAsArray() {
+        let allDataArray = []
+        this.allData.forEach(data => {
+            allDataArray.push(Object.keys(data).map((k) => {
+                if (Array.isArray(data[k]))
+                    return data[k] = data[k].toString()
+                return data[k];
+            }))
+        });
+        return allDataArray;
+    }
     static setAllData(_data) {
-        this.allDataArray.push(_data);
-        console.log("arrayData", this.allDataArray);
+        this.allData.push(_data);
     }
 }
+//Initialising
+var childLinks = [];
 const extractors = [
     {
-        dataMatch: new DataMatch("emails", new RegExp(/([A-z0-9_.+-]+@[A-z0-9_.-]+\.[A-z]+)/, 'g'))
+        dataMatch: new DataMatch("emails", "Emails", "allData", new RegExp(/([A-z0-9_.+-]+@[A-z0-9_.-]+\.[A-z]+)/, 'g'))
     },
     {
-        dataMatch: new DataMatch("facebookLinks", new RegExp(/(?:https?:\/\/)?(?:www\.)?(mbasic.facebook|m\.facebook|facebook|fb)\.(com|me)\/(?:(?:\w\.)*#!\/)?(?:pages\/)?(?:[\w\-\.]*\/)*([\w\-\.]*)/, 'ig'))
+        dataMatch: new DataMatch("facebookLinks", "Facebook Links", "allData", new RegExp(/(?:https?:\/\/)?(?:www\.)?(mbasic.facebook|m\.facebook|facebook|fb)\.(com|me)\/(?:(?:\w\.)*#!\/)?(?:pages\/)?(?:[\w\-\.]*\/)*([\w\-\.]*)/, 'ig'))
     },
     {
-        dataMatch: new DataMatch("instagramLinks", new RegExp(/(?:https?:)?\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)/, 'g'))
+        dataMatch: new DataMatch("instagramLinks", "Instagram Links", "allData", new RegExp(/(?:https?:)?\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/([A-Za-z0-9_](?:(?:[A-Za-z0-9_]|(?:\.(?!\.))){0,28}(?:[A-Za-z0-9_]))?)/, 'g'))
     },
     {
-        dataMatch: new DataMatch("linkedInLinks", new RegExp(/(?:https?:)?\/\/(?:[\w]+\.)?linkedin\.com\/((company)|(school))\/([A-z0-9-À-ÿ\.]+)\/?/, 'g'))
+        dataMatch: new DataMatch("linkedInLinks", "LinkedIn Links", "allData", new RegExp(/(?:https?:)?\/\/(?:[\w]+\.)?linkedin\.com\/((company)|(school))\/([A-z0-9-À-ÿ\.]+)\/?/, 'g'))
+    },
+    {
+        dataMatch: new DataMatch("phoneNumber", "Phone Numbers", "allLinks", new RegExp(/\(?([0-9]{3})\)?([ .-]?)([0-9]{3})\2([0-9]{4})/, 'g'))
     }
 ]
+//adding style to header values by add header Name to all Data object
+
+async function autoScroll(page) {
+    await page.evaluate(async () => {
+        await new Promise((resolve) => {
+            var totalHeight = 0;
+            var distance = 100;
+            var timer = setInterval(() => {
+                var scrollHeight = document.body.scrollHeight;
+                window.scrollBy(0, distance);
+                totalHeight += distance;
+
+                if (totalHeight >= scrollHeight - window.innerHeight) {
+                    clearInterval(timer);
+                    resolve();
+                }
+            }, 100);
+        });
+    });
+}
 async function extractLinks(rootUrl, urlToScrape, linktype) {
     const browser = await puppeteer.launch({ headless: false, ignoreHTTPSErrors: true });
     const page = await browser.newPage();
@@ -100,14 +150,18 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
         page.goto(urlToScrape, {
             waitUntil: "domcontentloaded",
         }),
-        page.waitForNetworkIdle({ idleTime: 2000 }),
+        // page.waitForNetworkIdle({ idleTime: 1000 }),
     ]);
     const extractedData = {
         rootUrl: rootUrl,
         url: urlToScrape,
     }
-    //populate childlinks
+    //scrolling to the bottom of the page 216s for 10 URLs with 2 Nodes in headless
+    //scrolling to the bottom of the page 337s for 10 URLs with 2 Nodes in headful
+    // await autoScroll(page)
+
     try {
+        //populate childlinks
         if (linktype != 'child') {
             const hrefs = await page.evaluate(
                 () => Array.from(
@@ -131,16 +185,30 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
                 return link
             })
         }
-    } catch (error) {
-        console.log(error);
-    }
-
-    try {
         // console.log("childLinks", childLinks)
-        const data = await page.evaluate(() => document.querySelector('*').outerHTML);
-
+        const fullPageData = await page.evaluate(() => document.querySelector('*').innerHTML);
+        const fullPageLinks = await page.evaluate(
+            () => Array.from(
+                document.querySelectorAll('a[href]'),
+                a => a.getAttribute('href')
+            )
+        );
         extractors.forEach(extractor => {
-            extractedData[extractor.dataMatch.name] = extractor.dataMatch.getExtractedData(data);
+            switch (extractor.dataMatch.type) {
+                case "allLinks":
+                    {
+                        extractedData[extractor.dataMatch.name] = extractor.dataMatch.getExtractedData(fullPageLinks);
+
+                    }
+                    break;
+                case "allData":
+                    {
+                        extractedData[extractor.dataMatch.name] = extractor.dataMatch.getExtractedData(fullPageData);
+                    }
+                    break;
+                default:
+                    break;
+            }
             // extractor.dataMatch.setAllData(rootUrl, urlToScrape, extractedData[extractor.dataMatch.name]);
         });
         await browser.close();
@@ -151,63 +219,78 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
     }
     await browser.close();
     // console.log("extractedData", extractedData);
-    DataMatch.setAllData(Object.values(extractedData))
-    allData.push(Object.values(extractedData))
+    DataMatch.setAllData(extractedData)
+    // allData.push(Object.values(extractedData))
 
 }
 async function refineAllData() {
-    const allDataToObj = DataMatch.allDataArray.map(([RootURL,
-        ScrapedURL,
-        Emails,
-        FacebookLinks,
-        InstagramLinks,
-        LinkedInLinks]) => {
-        return { RootURL, ScrapedURL, Emails: Emails.split(','), FacebookLinks: FacebookLinks.split(','), InstagramLinks: InstagramLinks.split(','), LinkedInLinks: LinkedInLinks.split(',') }
-    })
-
-    // console.log("allDataToObj", allDataToObj);
     //https://stackoverflow.com/questions/60036060/combine-object-array-if-same-key-value-in-javascript
-    const flattenedData = Object.values(allDataToObj).reduce((acc, curr) => {
-        const duplicate = acc.find(e => e.RootURL == curr.RootURL)
+    const flattenedData = Object.values(DataMatch.allData).reduce((acc, curr) => {
+        const duplicate = acc.find(e => e.rootUrl == curr.rootUrl)
         if (duplicate) {
-            duplicate.Emails = [...new Set([...duplicate.Emails, ...curr.Emails])]
-            duplicate.FacebookLinks = [...new Set([...duplicate.FacebookLinks, ...curr.FacebookLinks])]
-            duplicate.InstagramLinks = [...new Set([...duplicate.InstagramLinks, ...curr.InstagramLinks])]
-            duplicate.LinkedInLinks = [...new Set([...duplicate.LinkedInLinks, ...curr.LinkedInLinks])]
+            extractors.forEach(extractor => {
+                //logic for most occuring
+                let counts = curr[extractor.dataMatch.name].reduce((counts, num) => {
+                    counts[num] = (counts[num] || 0) + 1;
+                    return counts;
+                }, {});
+                let keys = Object.keys(counts)
+                keys.sort(function (p0, p1) {
+                    return counts[p1] - counts[p0];
+                });
+
+                //concate with existing
+                console.log(duplicate[extractor.dataMatch.name])
+                duplicate[extractor.dataMatch.name] = [...new Set([...duplicate[extractor.dataMatch.name], ...keys])]
+            });
         } else {
             acc.push(curr)
         }
         return acc
     }, [])
-    flattenedData.forEach(data => {
+    console.log("flattenedData", flattenedData);
+    flattenedData.shift();
+    flattenedData.forEach((data) => {
         const refinedDataInterface = {
-            url: data.RootURL,
-            possibleEmail: data.Emails[0],
-            otherEmails: data.Emails.slice(1).toString(),
-            possibleFacebookLink: data.FacebookLinks[0],
-            otherFacebookLinks: data.FacebookLinks.slice(1).toString(),
-            possibleInstagramLink: data.InstagramLinks[0],
-            otherInstagramLinks: data.InstagramLinks.slice(1).toString(),
-            possibleLinkedInLink: data.LinkedInLinks[0],
-            otherLinkedInLinks: data.LinkedInLinks.slice(1).toString(),
+            URL: data.rootUrl,
         }
-        refinedData.push(Object.values(refinedDataInterface));
+        extractors.forEach((extractor) => {
+            const name = extractor.dataMatch.name;
+            const displayName = extractor.dataMatch.displayName;
+            refinedDataInterface[displayName] = data[name][0] || '';
+            refinedDataInterface["Other" + displayName] = data[name].slice(1).toString();
+        })
+        DataMatch.refinedData.push(Object.values(refinedDataInterface));
     })
 
-    console.log("refinedData", refinedData);
-    // console.log("flattenedData", flattenedData);
+    console.log("refinedData", DataMatch.refinedData);
 }
 async function main() {
+    var sTime, eTime, ppsTime, ppeTime = 0;
+    sTime = performance.now();
     const workbook = XLSX.utils.book_new();
+    //create and style header
+    const allDataHeaderNames = [
+        'Root URL',
+        'Scraped URL',
+    ]
+    const refinedDataHeaderNames = [
+        "URL",
+    ]
+    extractors.forEach(extractor => {
+        allDataHeaderNames.push(extractor.dataMatch.headers.allData);
+        refinedDataHeaderNames.push(...extractor.dataMatch.headers.refinedData1);
+    })
 
-    styleHeader(allDataHeaderNames, allData)
-    styleHeader(refinedDataHeaderNames, refinedData)
-    for (let index = 0; index < rootUrlsToScrape.length; index++) {
-        const rootUrl = rootUrlsToScrape[index];
+
+    for (let index = 0; index < ROOT_URLS_TO_SCRAPE.length; index++) {
+        ppsTime = performance.now();
+
+        const rootUrl = ROOT_URLS_TO_SCRAPE[index];
         await extractLinks(rootUrl, rootUrl).then(async () => {
-            console.log("childLinks", childLinks)
-            for (let index = 0; index < childLinks.length; index++) {
-                const childLink = childLinks[index];
+            console.log("childLinks of " + `${rootUrl}`, childLinks)
+            for (let i = 0; i < childLinks.length; i++) {
+                const childLink = childLinks[i];
                 try {
                     await extractLinks(rootUrl, childLink, 'child');
                 } catch (error) {
@@ -215,15 +298,22 @@ async function main() {
                 }
             }
         });
-        console.log("allData", allData);
+        ppeTime = performance.now();
+        console.log("allData", DataMatch.allData);
+        console.log(`Time taken for ${rootUrl}(${index}):` + ` ${(ppeTime - ppsTime) / 1000}s`)
 
     }
     await refineAllData()
+    DataMatch.styleHeader(allDataHeaderNames, DataMatch.allData)
+    DataMatch.styleHeader(refinedDataHeaderNames, DataMatch.refinedData)
+    const allData = DataMatch.getAllDataAsArray()
     workbook.SheetNames.push("Refined Data");
     workbook.SheetNames.push("All Data");
-    workbook.Sheets["Refined Data"] = XLSX.utils.aoa_to_sheet(refinedData);
-    workbook.Sheets["All Data"] = XLSX.utils.aoa_to_sheet(DataMatch.allDataArray);
+    workbook.Sheets["Refined Data"] = XLSX.utils.aoa_to_sheet(DataMatch.refinedData);
+    workbook.Sheets["All Data"] = XLSX.utils.aoa_to_sheet(allData);
     XLSX.writeFile(workbook, `check.xlsx`);
+    eTime = performance.now();
+    console.log("Total time taken:" + ` ${(eTime - sTime) / 1000}s`)
 
 }
 main();
