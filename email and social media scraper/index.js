@@ -3,19 +3,41 @@ import * as XLSX from 'sheetjs-style';
 import { performance } from 'perf_hooks';
 import parsePhoneNumber from 'libphonenumber-js'
 //User provided constants 
-const MAX_CHILD_NODES = 2;
-const ROOT_URLS_TO_SCRAPE = [
+const MAX_CHILD_NODES = 1;
+const REQUEST = [
     // "https://www.scrapefox.vercel.app/",
     // "https://bdswimmingpool.com/",
     // "https://www.nidirect.gov.uk/",
     // "https://sblpools.com/",
-    "https://www.greenscenelandscape.com/",
-    "https://www.encorepoolsla.com/",
-    "https://www.executivepools.org/",
+    // "https://www.greenscenelandscape.com/",
+    // "https://www.encorepoolsla.com/",
+    // "https://www.executivepools.org/",
     // "https://calimingo.com/",
     // "https://californiapools.com/locations/",
     // "https://custommojavepool.com/",
+    "http://www.murphypoolsandspas.com/",
+    "http://www.alanjacksonpools.com/",
+    "http://www.edpoolandspa.com/",
+    // http://www.bigjohnspools.com/
+    // https://sblpools.com/
+    // http://poolbosscorp.com/
+    // http://www.camposcustomconcrete.com/
+    // https://www.greenscenelandscape.com/
+    // https://www.encorepoolsla.com/
+    // http://sbwpoolsinc.com/
+    // https://www.executivepools.org/
+    // https://calimingo.com/
+    // https://californiapools.com/locations/santa-clarita?utm_source=google&utm_medium=organic&utm_campaign=gmb&utm_content=santaclarita
+    // https://custommojavepool.com/
+    // http://www.horusicky.com/
+    // https://aquamanwest.com/
+    // http://www.sunsetpoolscustomdesigns.com/
+    // http://gotsplash.com/
+    // http://temeculavalleycustompools.com/
+
 ]
+const refinedData = [];
+const allData = [];
 class DataMatch {
     constructor(_name, _displayName, _type, _regExp) {
         this.name = _name;
@@ -66,10 +88,10 @@ class DataMatch {
                 break;
         }
     }
-    static {
-        this.refinedData = [[]];
-        this.allData = [[]];
-    }
+    // static {
+    //     this.refinedData = [];
+    //     this.allData = [[]];
+    // }
     static styleHeader(headerArray, data) {
         headerArray.forEach(header => {
             data[0].push({
@@ -90,7 +112,7 @@ class DataMatch {
 
     static getAllDataAsArray() {
         let allDataArray = []
-        this.allData.forEach(data => {
+        allData.forEach(data => {
             allDataArray.push(Object.keys(data).map((k) => {
                 if (Array.isArray(data[k]))
                     return data[k] = data[k].toString()
@@ -100,7 +122,7 @@ class DataMatch {
         return allDataArray;
     }
     static setAllData(_data) {
-        this.allData.push(_data);
+        allData.push(_data);
     }
 }
 //Initialising
@@ -143,15 +165,13 @@ async function autoScroll(page) {
     });
 }
 async function extractLinks(rootUrl, urlToScrape, linktype) {
-    const browser = await puppeteer.launch({ headless: false, ignoreHTTPSErrors: true });
+    const browser = await puppeteer.launch({ headless: true, ignoreHTTPSErrors: true });
     const page = await browser.newPage();
 
-    await Promise.all([
-        page.goto(urlToScrape, {
-            waitUntil: "domcontentloaded",
-        }),
-        // page.waitForNetworkIdle({ idleTime: 1000 }),
-    ]);
+    await page.goto(urlToScrape, {
+        waitUntil: "domcontentloaded",
+    }).catch(err => console.log("goto", err))
+    // page.waitForNetworkIdle({ idleTime: 1000 }),
     const extractedData = {
         rootUrl: rootUrl,
         url: urlToScrape,
@@ -225,7 +245,7 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
 }
 async function refineAllData() {
     //https://stackoverflow.com/questions/60036060/combine-object-array-if-same-key-value-in-javascript
-    const flattenedData = Object.values(DataMatch.allData).reduce((acc, curr) => {
+    const flattenedData = Object.values(allData).reduce((acc, curr) => {
         const duplicate = acc.find(e => e.rootUrl == curr.rootUrl)
         if (duplicate) {
             extractors.forEach(extractor => {
@@ -235,6 +255,7 @@ async function refineAllData() {
                     return counts;
                 }, {});
                 let keys = Object.keys(counts)
+                //sort most occuring first 222331
                 keys.sort(function (p0, p1) {
                     return counts[p1] - counts[p0];
                 });
@@ -260,12 +281,12 @@ async function refineAllData() {
             refinedDataInterface[displayName] = data[name][0] || '';
             refinedDataInterface["Other" + displayName] = data[name].slice(1).toString();
         })
-        DataMatch.refinedData.push(Object.values(refinedDataInterface));
+        refinedData.push(refinedDataInterface);
     })
 
-    console.log("refinedData", DataMatch.refinedData);
+    console.log("refinedData", refinedData);
 }
-async function main() {
+async function emailAndContactsScraper(ROOT_URLS_TO_SCRAPE) {
     var sTime, eTime, ppsTime, ppeTime = 0;
     sTime = performance.now();
     const workbook = XLSX.utils.book_new();
@@ -299,21 +320,22 @@ async function main() {
             }
         });
         ppeTime = performance.now();
-        console.log("allData", DataMatch.allData);
+        console.log("allData", allData);
         console.log(`Time taken for ${rootUrl}(${index}):` + ` ${(ppeTime - ppsTime) / 1000}s`)
 
     }
     await refineAllData()
-    DataMatch.styleHeader(allDataHeaderNames, DataMatch.allData)
-    DataMatch.styleHeader(refinedDataHeaderNames, DataMatch.refinedData)
-    const allData = DataMatch.getAllDataAsArray()
-    workbook.SheetNames.push("Refined Data");
-    workbook.SheetNames.push("All Data");
-    workbook.Sheets["Refined Data"] = XLSX.utils.aoa_to_sheet(DataMatch.refinedData);
-    workbook.Sheets["All Data"] = XLSX.utils.aoa_to_sheet(allData);
-    XLSX.writeFile(workbook, `check.xlsx`);
+    console.log("DataMatch.refinedData", refinedData)
+    // DataMatch.styleHeader(allDataHeaderNames, DataMatch.allData)
+    // DataMatch.styleHeader(refinedDataHeaderNames, DataMatch.refinedData)
+    // const allData = DataMatch.getAllDataAsArray()
+    // workbook.SheetNames.push("Refined Data");
+    // workbook.SheetNames.push("All Data");
+    // workbook.Sheets["Refined Data"] = XLSX.utils.aoa_to_sheet(DataMatch.refinedData);
+    // workbook.Sheets["All Data"] = XLSX.utils.aoa_to_sheet(allData);
+    // XLSX.writeFile(workbook, `check.xlsx`);
     eTime = performance.now();
     console.log("Total time taken:" + ` ${(eTime - sTime) / 1000}s`)
 
 }
-main();
+emailAndContactsScraper(REQUEST);
