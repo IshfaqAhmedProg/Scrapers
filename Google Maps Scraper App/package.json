@@ -1,0 +1,19 @@
+{
+  "name": "google-maps-scraper-app",
+  "version": "1.0.0",
+  "description": "Scrape google maps listings and their email addresses",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ishfaq Ahmed",
+  "license": "ISC",
+  "dependencies": {
+    "libphonenumber-js": "^1.10.26",
+    "puppeteer": "^19.8.5",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "sheetjs-style": "^0.15.8",
+    "xlsx": "^0.18.5"
+  }
+}

@@ -1,43 +1,10 @@
-import puppeteer from 'puppeteer';
-import * as XLSX from 'sheetjs-style';
-import { performance } from 'perf_hooks';
-import parsePhoneNumber from 'libphonenumber-js'
+const puppeteer = require("puppeteer");
+const parsePhoneNumber = require('libphonenumber-js')
+const { performance } = require('perf_hooks');
 //User provided constants 
-const MAX_CHILD_NODES = 1;
-const REQUEST = [
-    // "https://www.scrapefox.vercel.app/",
-    // "https://bdswimmingpool.com/",
-    // "https://www.nidirect.gov.uk/",
-    // "https://sblpools.com/",
-    // "https://www.greenscenelandscape.com/",
-    // "https://www.encorepoolsla.com/",
-    // "https://www.executivepools.org/",
-    // "https://calimingo.com/",
-    // "https://californiapools.com/locations/",
-    // "https://custommojavepool.com/",
-    "http://www.murphypoolsandspas.com/",
-    "http://www.alanjacksonpools.com/",
-    "http://www.edpoolandspa.com/",
-    // http://www.bigjohnspools.com/
-    // https://sblpools.com/
-    // http://poolbosscorp.com/
-    // http://www.camposcustomconcrete.com/
-    // https://www.greenscenelandscape.com/
-    // https://www.encorepoolsla.com/
-    // http://sbwpoolsinc.com/
-    // https://www.executivepools.org/
-    // https://calimingo.com/
-    // https://californiapools.com/locations/santa-clarita?utm_source=google&utm_medium=organic&utm_campaign=gmb&utm_content=santaclarita
-    // https://custommojavepool.com/
-    // http://www.horusicky.com/
-    // https://aquamanwest.com/
-    // http://www.sunsetpoolscustomdesigns.com/
-    // http://gotsplash.com/
-    // http://temeculavalleycustompools.com/
+const MAX_CHILD_NODES = 0; //the number of child urls to scrape for data
 
-]
-// const DataMatch.refinedData = [];
-// const DataMatch.allData = [];
+
 class DataMatch {
     constructor(_name, _displayName, _type, _regExp) {
         this.name = _name;
@@ -89,37 +56,11 @@ class DataMatch {
         }
     }
 
-    static styleHeader(headerArray, data) {
-        headerArray.forEach(header => {
-            data[0].push({
-                v: `${header}`, t: "s", s: {
-                    font: { bold: true, color: { rgb: "FFFFFFFF" } },
-                    fill: { fgColor: { rgb: "FF7B68EE" } },
-                    border: {
-                        top: { style: "medium", color: { rgb: "FF7B68EE" } },
-                        bottom: { style: "medium", color: { rgb: "FF7B68EE" } },
-                        left: { style: "medium", color: { rgb: "FF7B68EE" } },
-                        right: { style: "medium", color: { rgb: "FF7B68EE" } }
-                    },
-                    alignment: { wrapText: true }
-                }
-            });
-        });
-    }
 
-    static getAllDataAsArray() {
-        let allDataArray = []
-        this.allData.forEach(data => {
-            allDataArray.push(Object.keys(data).map((k) => {
-                if (Array.isArray(data[k]))
-                    return data[k] = data[k].toString()
-                return data[k];
-            }))
-        });
-        return allDataArray;
-    }
+
+
     // static setAllData(_data) {
-    //     this.allData.push(_data);
+    //     allData.push(_data);
     // }
 }
 //Initialising
@@ -142,7 +83,50 @@ const extractors = [
     }
 ]
 //adding style to header values by add header Name to all Data object
+exports.emailAndContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
+    var refinedData = [];
+    const allData = [[]];
+    //create and style header
+    const allDataHeaderNames = [
+        'Root URL',
+        'Scraped URL',
+    ]
+    const refinedDataHeaderNames = [
+        "URL",
+    ]
+    extractors.forEach(extractor => {
+        allDataHeaderNames.push(extractor.dataMatch.headers.allData);
+        refinedDataHeaderNames.push(...extractor.dataMatch.headers.refinedData1);
+    })
 
+
+    for (let index = 0; index < ROOT_URLS_TO_SCRAPE.length; index++) {
+
+        const rootUrl = ROOT_URLS_TO_SCRAPE[index];
+        await extractLinks(rootUrl, rootUrl).then(async (extract) => {
+            allData.push(extract);
+            // console.log("childLinks of " + `${rootUrl}`, childLinks)
+            for (let i = 0; i < childLinks.length; i++) {
+                const childLink = childLinks[i];
+                try {
+                    await extractLinks(rootUrl, childLink, 'child').then(extract => {
+                        allData.push(extract);
+                    });
+                } catch (error) {
+                    continue
+                }
+            }
+        });
+        // console.log("allData", allData);
+
+    }
+    await refineAllData(allData).then((data) => refinedData = data).catch((err) => {
+        console.error("\x1b[31mError refining enc scraped data!\x1b[37m")
+    })
+    // console.log("DataMatch.refinedData", refinedData)
+    return refinedData
+
+}
 async function autoScroll(page) {
     await page.evaluate(async () => {
         await new Promise((resolve) => {
@@ -167,8 +151,9 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
 
     await page.goto(urlToScrape, {
         waitUntil: "domcontentloaded",
-    }).catch(err => console.log("goto", err))
+    }).catch(err => console.error("\x1b[31mNot possible to scrape\x1b[37m", urlToScrape))
     // page.waitForNetworkIdle({ idleTime: 1000 }),
+
     const extractedData = {
         rootUrl: rootUrl,
         url: urlToScrape,
@@ -231,13 +216,13 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
         await browser.close();
 
     } catch (error) {
-        console.log('The browser timedout!', error)
+        console.log('\x1b[31mThe browser timedout on\x1b[37m', rootUrl)
         await browser.close();
     }
     await browser.close();
     // console.log("extractedData", extractedData);
-    return extractedData;
     // DataMatch.setAllData(extractedData)
+    return extractedData;
     // allData.push(Object.values(extractedData))
 
 }
@@ -260,7 +245,7 @@ async function refineAllData(allData) {
                 });
 
                 //concate with existing
-                console.log(duplicate[extractor.dataMatch.name])
+                // console.log(duplicate[extractor.dataMatch.name])
                 duplicate[extractor.dataMatch.name] = [...new Set([...duplicate[extractor.dataMatch.name], ...keys])]
             });
         } else {
@@ -268,11 +253,11 @@ async function refineAllData(allData) {
         }
         return acc
     }, [])
-    console.log("flattenedData", flattenedData);
+    // console.log("flattenedData", flattenedData);
     flattenedData.shift();
     flattenedData.forEach((data) => {
         const refinedDataInterface = {
-            URL: data.rootUrl,
+            website: data.rootUrl,
         }
         extractors.forEach((extractor) => {
             const name = extractor.dataMatch.name;
@@ -282,65 +267,6 @@ async function refineAllData(allData) {
         })
         refinedData.push(refinedDataInterface);
     })
-    // console.log("refinedData", refinedData);
     return refinedData;
+    // console.log("refinedData", refinedData);
 }
-async function emailAndContactsScraper(ROOT_URLS_TO_SCRAPE) {
-    var sTime, eTime, ppsTime, ppeTime = 0;
-    const refinedData = [];
-    const allData = [[]];
-    sTime = performance.now();
-    const workbook = XLSX.utils.book_new();
-    //create and style header
-    const allDataHeaderNames = [
-        'Root URL',
-        'Scraped URL',
-    ]
-    const refinedDataHeaderNames = [
-        "URL",
-    ]
-    extractors.forEach(extractor => {
-        allDataHeaderNames.push(extractor.dataMatch.headers.allData);
-        refinedDataHeaderNames.push(...extractor.dataMatch.headers.refinedData1);
-    })
-
-
-    for (let index = 0; index < ROOT_URLS_TO_SCRAPE.length; index++) {
-        ppsTime = performance.now();
-
-        const rootUrl = ROOT_URLS_TO_SCRAPE[index];
-        await extractLinks(rootUrl, rootUrl).then(async (extract) => {
-            console.log("extract", extract)
-            allData.push(extract);
-            console.log("childLinks of " + `${rootUrl}`, childLinks)
-            for (let i = 0; i < childLinks.length; i++) {
-                const childLink = childLinks[i];
-                try {
-                    await extractLinks(rootUrl, childLink, 'child').then(extract => {
-                        allData.push(extract);
-                        console.log("extract", extract)
-                    });
-                } catch (error) {
-                    continue
-                }
-            }
-        });
-        ppeTime = performance.now();
-        console.log("allData", allData);
-        console.log(`Time taken for ${rootUrl}(${index}):` + ` ${(ppeTime - ppsTime) / 1000}s`)
-
-    }
-    await refineAllData(allData).then((data) => refinedData.push(data))
-    console.log("DataMatch.refinedData", refinedData)
-    // DataMatch.styleHeader(allDataHeaderNames, allData)
-    // DataMatch.styleHeader(refinedDataHeaderNames, refinedData)
-    // workbook.SheetNames.push("Refined Data");
-    // workbook.SheetNames.push("All Data");
-    // workbook.Sheets["Refined Data"] = XLSX.utils.json_to_sheet(refinedData);
-    // workbook.Sheets["All Data"] = XLSX.utils.json_to_sheet(allData);
-    // XLSX.writeFile(workbook, `check.xlsx`);
-    eTime = performance.now();
-    console.log("Total time taken:" + ` ${(eTime - sTime) / 1000}s`)
-
-}
-emailAndContactsScraper(REQUEST);
