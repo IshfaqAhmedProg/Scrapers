@@ -166,7 +166,9 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
         waitUntil: "domcontentloaded",
     }).catch(err => console.error("\x1b[31mNot possible to scrape\x1b[37m", urlToScrape))
     // page.waitForNetworkIdle({ idleTime: 1000 }),
-
+    const session = await page.target().createCDPSession();
+    const {windowId} = await session.send('Browser.getWindowForTarget');
+    await session.send('Browser.setWindowBounds', {windowId, bounds: {windowState: 'minimized'}});
     const extractedData = {
         rootUrl: rootUrl,
         url: urlToScrape,

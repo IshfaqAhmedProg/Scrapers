@@ -203,7 +203,7 @@ async function main() {
                         const websiteExtract = scrapedData
                             .filter((result) => result.website !== "")
                             .map((result) => result.website);
-                        console.log('\x1b[37mScraping email and contacts on:', websiteExtract.length, "websites")
+                        console.log('\x1b[37mStarted scraping email and contacts on:', websiteExtract.length, "websites")
                         //run email and contact scraper
                         var sTime = performance.now();
                         const encData = await emailContactScraper.emailAndContactsScraper(websiteExtract)
