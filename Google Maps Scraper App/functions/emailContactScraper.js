@@ -96,6 +96,7 @@ const extractors = [
 exports.emailAndContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
     var refinedData = [];
     const allData = [[]];
+    var totalChildLinks = 0
     //create and style header
     const allDataHeaderNames = [
         'Root URL',
@@ -116,6 +117,7 @@ exports.emailAndContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
         await extractLinks(rootUrl, rootUrl).then(async (extract) => {
             allData.push(extract);
             // console.log("childLinks of " + `${rootUrl}`, childLinks)
+            totalChildLinks = totalChildLinks + childLinks.length
             for (let i = 0; i < childLinks.length; i++) {
                 const childLink = childLinks[i];
                 try {
@@ -134,6 +136,7 @@ exports.emailAndContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
         console.error("\x1b[31mError refining enc scraped data!\x1b[37m")
     })
     // console.log("DataMatch.refinedData", refinedData)
+    console.log('Total URLs scraped for enc:', ROOT_URLS_TO_SCRAPE.length + totalChildLinks)
     return refinedData
 
 }

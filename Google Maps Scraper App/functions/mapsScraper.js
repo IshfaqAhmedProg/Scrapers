@@ -6,7 +6,7 @@ puppeteer.use(StealthPlugin());
 
 exports.scrapeGoogleMaps = async function (request) {
   try {
-    console.log('\n\x1b[37mStarted process for\x1b[37m', request.country, request.state, request.city);
+    console.log(`\n\x1b[37mStarted process for ${request.country}, ${request.state}, ${request.city}, Please wait...\x1b[37m`);
     var sTime = performance.now();
     const result = []
     for (let index = 0; index < request.keywords.length; index++) {
