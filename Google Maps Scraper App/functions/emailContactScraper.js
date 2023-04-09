@@ -3,6 +3,7 @@ const parsePhoneNumber = require('libphonenumber-js')
 const { performance } = require('perf_hooks');
 //User provided constants 
 const MAX_CHILD_NODES = 1; //the number of child urls to scrape for data
+const excludeEmails = ['@sentry-next.wixpress.com', '@sentry.wixpress.com', '@sentry.io', '.png']
 
 
 class DataMatch {
@@ -48,7 +49,6 @@ class DataMatch {
                             extractedDataArray.push(item[0])
                         }
                     }
-                    const exclude = ['@sentry-next.wixpress.com', '@sentry.wixpress.com', '@sentry.io', '.png']
                     if (this.name == 'emails') {
                         for (let i = 0; i < extractedDataArray.length; i++) {
                             const email = extractedDataArray[i].toLowerCase().trim();
@@ -162,10 +162,6 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
     const browser = await puppeteer.launch({ headless: false, ignoreHTTPSErrors: true });
     const page = await browser.newPage();
 
-    await page.goto(urlToScrape, {
-        waitUntil: "domcontentloaded",
-    }).catch(err => console.error("\x1b[31mNot possible to scrape\x1b[37m", urlToScrape))
-    // page.waitForNetworkIdle({ idleTime: 1000 }),
     const session = await page.target().createCDPSession();
     const {windowId} = await session.send('Browser.getWindowForTarget');
     await session.send('Browser.setWindowBounds', {windowId, bounds: {windowState: 'minimized'}});
@@ -173,6 +169,10 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
         rootUrl: rootUrl,
         url: urlToScrape,
     }
+    await page.goto(urlToScrape, {
+        waitUntil: "domcontentloaded",
+    }).catch(err => console.error("\x1b[31mNot possible to scrape\x1b[37m", urlToScrape))
+    // page.waitForNetworkIdle({ idleTime: 1000 }),
     //scrolling to the bottom of the page 216s for 10 URLs with 2 Nodes in headless
     //scrolling to the bottom of the page 337s for 10 URLs with 2 Nodes in headful
     // await autoScroll(page)

@@ -63,6 +63,8 @@ async function userIO(stage, condition) {
       \x1b[37mFormat\x1b[32m   => {"keywords":["keyword1","keyword2",...]}\x1b[37m\n
 2)\x1b[32m To change the locations add it to locations.json file (Set by default to US).\x1b[37m
       \x1b[37mFormat\x1b[32m   => {"Country1":[{"state":"state1","city":"city1","lat":100,"lng":200},...],...}\x1b[37m
+3)\x1b[32m If any of the emails are dummy mails or you want to exclude add it to excludeEmails in line 6 of emailContactScraper.js.\x1b[37m
+3)\x1b[32m If any of the contacts pages are being left out add the keyword to contactTypePage on line 190 of emailContactScraper.js \x1b[37m
             `);
         }
             break;
@@ -218,7 +220,7 @@ async function main() {
                         await writeDataToExcel(finalData, { outputPath, outputName });
 
                     }
-                    
+
                 } else {
                     GLOBAL.restartProcess = true;
                 }
