@@ -218,6 +218,7 @@ async function main() {
                         await writeDataToExcel(finalData, { outputPath, outputName });
 
                     }
+                    
                 } else {
                     GLOBAL.restartProcess = true;
                 }

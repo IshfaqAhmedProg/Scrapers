@@ -21,7 +21,7 @@ exports.scrapeGoogleMaps = async function (request) {
     console.log("\x1b[32m" + `Done scraping Google Maps for ${request.city}! TTC:${eTime - sTime}ms`)
     return dedupedResult;
   } catch (error) {
-    throw new Error('Error in scrapeGoogleMaps:', error);
+    console.log(error)
   }
 }
 async function scrollPage(page, scrollContainer) {

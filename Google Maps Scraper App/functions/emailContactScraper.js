@@ -2,7 +2,7 @@ const puppeteer = require("puppeteer");
 const parsePhoneNumber = require('libphonenumber-js')
 const { performance } = require('perf_hooks');
 //User provided constants 
-const MAX_CHILD_NODES = 0; //the number of child urls to scrape for data
+const MAX_CHILD_NODES = 1; //the number of child urls to scrape for data
 
 
 class DataMatch {
@@ -46,6 +46,16 @@ class DataMatch {
                         if (extractedDataArray.indexOf(item[0]) === -1)//prevent duplicates
                         {
                             extractedDataArray.push(item[0])
+                        }
+                    }
+                    const exclude = ['@sentry-next.wixpress.com', '@sentry.wixpress.com', '@sentry.io', '.png']
+                    if (this.name == 'emails') {
+                        for (let i = 0; i < extractedDataArray.length; i++) {
+                            const email = extractedDataArray[i].toLowerCase().trim();
+                            if (exclude.some((domain) => email.includes(domain))) {
+                                extractedDataArray.splice(i, 1);
+                                i--;
+                            }
                         }
                     }
                     return extractedDataArray;
@@ -146,7 +156,7 @@ async function autoScroll(page) {
     });
 }
 async function extractLinks(rootUrl, urlToScrape, linktype) {
-    const browser = await puppeteer.launch({ headless: true, ignoreHTTPSErrors: true });
+    const browser = await puppeteer.launch({ headless: false, ignoreHTTPSErrors: true });
     const page = await browser.newPage();
 
     await page.goto(urlToScrape, {
@@ -171,11 +181,19 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
                     a => a.getAttribute('href')
                 )
             );
-            //filter out queryURL, '/' and /#sectionofpage and keep url type objects ie:"https://website.com/abcd" or 
-            //subdirectory type objects i.e:"/abcd" 
-            const filteredHref = hrefs.filter((c, index) => {
-                if (c.includes(urlToScrape) && c != urlToScrape || c.indexOf('/') == 0 && c.indexOf('#') != 1 && c != "/") {
-                    return hrefs.indexOf(c) === index;
+
+            const contactTypePage = ["contacts", 'contact', 'contact-us', 'contactUs', 'contact-Us', 'contact_us']
+            const filteredHref = hrefs.filter((childUrl, index) => {
+                //filter out queryURL, '/' and /#sectionofpage and keep url type objects ie:"https://website.com/abcd" or 
+                //subdirectory type objects i.e:"/abcd" 
+                if (
+                    childUrl.includes(urlToScrape) && childUrl != urlToScrape
+                    || childUrl.indexOf('/') == 0 && childUrl.indexOf('#') != 1 && childUrl != "/"
+
+                ) {
+                    //and if childurl is a contacts type page
+                    if (contactTypePage.some((substring) => childUrl.includes(substring)))
+                        return hrefs.indexOf(childUrl) === index;
                 }
             })
             filteredHref.length = Math.min(filteredHref.length, MAX_CHILD_NODES);
@@ -186,8 +204,9 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
                 }
                 return link
             })
+            // console.log("childLinks", childLinks)
+
         }
-        // console.log("childLinks", childLinks)
         const fullPageData = await page.evaluate(() => document.querySelector('*').innerHTML);
         const fullPageLinks = await page.evaluate(
             () => Array.from(
@@ -216,7 +235,7 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
         await browser.close();
 
     } catch (error) {
-        console.log('\x1b[31mThe browser timedout on\x1b[37m', rootUrl)
+        console.log('\x1b[31mThe browser timedout on\x1b[37m', rootUrl, error)
         await browser.close();
     }
     await browser.close();
@@ -253,7 +272,7 @@ async function refineAllData(allData) {
         }
         return acc
     }, [])
-    // console.log("flattenedData", flattenedData);
+    console.log("flattenedData", flattenedData);
     flattenedData.shift();
     flattenedData.forEach((data) => {
         const refinedDataInterface = {
