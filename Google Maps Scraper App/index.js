@@ -47,7 +47,24 @@ const GLOBAL = {
     }
 
 }
+function totalTime() {
+    const GMTIME = 60;
+    const ENCTIME = 10.5;
+    const FBTIME = 6.5;
+    const NTTIME = 8.5;
+    const AVGENC = 60;
+    const AVGNT = 20;
+    const AVGFB = 50;
+    let total = (
+        ((GLOBAL.keywordCount * GMTIME)
+            + (AVGENC * ENCTIME)
+            + (GLOBAL.scrapeFacebook.process && (AVGFB * FBTIME))
+            + (GLOBAL.scrapeNameTitle.process && (AVGNT * NTTIME)))
+        * GLOBAL.locationCount
+    )
 
+    return total
+}
 async function userIO(stage, condition) {
     switch (stage) {
         case 'Initialise': {
@@ -186,6 +203,7 @@ Phone Numbers, Social Media Links, Facebook public pages and Online Presence, fo
                     console.log(`Expected number of results:\x1b[32m${GLOBAL.locationCount * GLOBAL.keywordCount * 120}\x1b[37m`)
                     console.log(`Scrape facebook:\x1b[32m${GLOBAL.scrapeFacebook.process}\x1b[37m`)
                     console.log(`Find people associated with business:\x1b[32m${GLOBAL.scrapeNameTitle.process}\x1b[37m`)
+                    // console.log(`Estimated time to scrape:\x1b[32m${totalTime()}s\x1b[37m`)
                     GLOBAL.start.processInput = await prompt("\x1b[32m" + `\nStart the Scraping?\x1b[37m Y/N: `);
                     if (GLOBAL.start.processInput.match(/^[YNyn]$/)) {
                         if (GLOBAL.start.processInput.match(/^[Yy]$/)) {
@@ -217,7 +235,8 @@ async function joinData(toJoin, joinWith, joinBy) {
 }
 async function writeDataToExcel(resultData, location) {
     console.log(`\x1b[37mWriting file to:`, `${location.outputPath}/${location.outputName}\x1b[37m`)
-    const headers = Object.keys(resultData);
+    const headers = Object.keys(
+        resultData[0]);
     const aoaData = [[]];
     resultData.map((obj) => {
         aoaData.push(Object.values(obj));
@@ -254,7 +273,7 @@ async function createDir(path) {
         fs.mkdirSync(path, { recursive: true }, err => { console.log("Error creating path", err) });
     }
 }
-async function normalizeArrayOfObjects(arr) {
+function normalizeArrayOfObjects(arr) {
     if (arr.length === 0) {
         return arr;
     }
@@ -268,20 +287,25 @@ async function normalizeArrayOfObjects(arr) {
     }
     // Create an array of keys with the highest number of keys
     const keys = [];
-    for (let i = 0; i < maxKeys; i++) {
-        keys.push(`key${i}`);
+    for (const obj of arr) {
+        for (const key of Object.keys(obj)) {
+            if (!keys.includes(key)) {
+                keys.push(key);
+            }
+        }
     }
     // Update each object in the array with the same keys
     for (let i = 0; i < arr.length; i++) {
         const obj = arr[i];
         for (const key of keys) {
-            if (!(key in obj)) {
+            if (!obj.hasOwnProperty(key)) {
                 obj[key] = "";
             }
         }
     }
     return arr;
 }
+
 async function main() {
     await userIO('Initialise')
     // const result = await nameTitleScraper(['hjeffcoat@burtonadvertising.com', 'impallari@gmail.com', 'blanders@oakwood.edu', 'heather@heatherjeffcoatpr.com'])
@@ -312,16 +336,16 @@ async function main() {
 
                         //extract websites from the results
                         const websiteExtract = scrapedData
-                            .filter((result) => result.website !== "")
+                            .filter((result) => result.website)
                             .map((result) => result.website);
-                        // websiteExtract.length = 20
+                        // websiteExtract.length = 10
                         //run email and contact scraper
                         console.log('\n\x1b[37mStarted scraping email and contacts on:', websiteExtract.length, "websites, please wait...")
                         var sTimeEnc = performance.now();
                         const encData = await emailContactsScraper(websiteExtract)
                         var eTimeEnc = performance.now();
                         console.log(`\x1b[32mDone scraping Email and Contacts for ${location.city}! TTC:${((eTimeEnc - sTimeEnc) / 1000).toFixed(2)}s\x1b[37m`)
-                        // fs.writeFileSync('Logs/encData.json', JSON.stringify(encData))
+                        fs.writeFileSync('Logs/encData.json', JSON.stringify(encData))
 
 
                         // full outer join on encData and scrapedData by website
@@ -330,7 +354,7 @@ async function main() {
                         if (GLOBAL.scrapeNameTitle.process) {
                             //extract emails from finalData
                             const emailExtract = finalData
-                                .filter((result) => result.emails !== undefined)
+                                .filter((result) => result.emails)
                                 .map((result) => result.emails);
                             // emailExtract.length = 10
 
@@ -340,16 +364,17 @@ async function main() {
                             const nTData = await nameTitleScraper(emailExtract);
                             var eTimeNt = performance.now();
                             console.log(`\x1b[32mDone scraping names for ${location.city}! TTC:${((eTimeNt - sTimeNt) / 1000).toFixed(2)}s\x1b[37m`)
-                            // fs.writeFileSync('Logs/ntData.json', JSON.stringify(nTData));
+                            fs.writeFileSync('Logs/ntData.json', JSON.stringify(nTData));
                             // full outer join on nTData and finalData by website
                             finalData = await joinData(nTData, finalData, 'emails')
-                            // fs.writeFileSync('Logs/finalData1.json', JSON.stringify(finalData));
+                            finalData = await normalizeArrayOfObjects(finalData);
+                            fs.writeFileSync('Logs/finalData1.json', JSON.stringify(finalData));
                         }
 
                         if (GLOBAL.scrapeFacebook.process) {
                             //extract fbLinks from finalData
                             const fbLinksExtract = finalData
-                                .filter((result) => result.facebookLinks !== undefined)
+                                .filter((result) => result.facebookLinks)
                                 .map((result) => result.facebookLinks);
                             // fbLinksExtract.length = 10
                             // console.log("fbLinksExtract", fbLinksExtract)
@@ -360,13 +385,13 @@ async function main() {
                             const fBData = await facebookScraper(fbLinksExtract);
                             var eTimeFb = performance.now();
                             console.log(`\x1b[32mDone scraping facebook for ${location.city}! TTC:${((eTimeFb - sTimeFb) / 1000).toFixed(2)}s\x1b[37m`)
-                            // fs.writeFileSync('Logs/fbData.json', JSON.stringify(fBData));
+                            fs.writeFileSync('Logs/fbData.json', JSON.stringify(fBData));
 
                             // full outer join on nTData and finalData by fblinks
                             finalData = await joinData(fBData, finalData, 'facebookLinks')
-                            // fs.writeFileSync('Logs/finalData2.json', JSON.stringify(finalData));
+                            finalData = await normalizeArrayOfObjects(finalData);
+                            fs.writeFileSync('Logs/finalData2.json', JSON.stringify(finalData));
                         }
-                        finalData = await normalizeArrayOfObjects(finalData);
                         //write the data to excel to file output/<country>/<state>/<city>.xlsx
                         const outputPath = `./output/${location.country}/${location.state}`
                         const outputName = `${location.city}.xlsx`

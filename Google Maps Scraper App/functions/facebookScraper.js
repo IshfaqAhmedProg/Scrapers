@@ -10,8 +10,10 @@ exports.facebookScraper = async function (request) {
     try {
         const result = []
         for (const url of request) {
-            const buffer = url ? await getFacebookInfo(url) : {};
-            result.push(buffer);
+            if (url) {
+                const buffer = await getFacebookInfo(url);
+                result.push(buffer);
+            }
         }
         // const dedupedResult = [...new Map(result.map(v => [v.title, v])).values()]
         return result;

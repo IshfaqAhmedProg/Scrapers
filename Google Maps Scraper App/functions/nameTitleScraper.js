@@ -10,8 +10,10 @@ exports.nameTitleScraper = async function (request) {
     try {
         const result = []
         for (const email of request) {
-            const buffer = email ? await getResults(email) : {};
-            result.push(buffer);
+            if (email) {
+                const buffer = await getResults(email);
+                result.push(buffer);
+            }
         }
         // const dedupedResult = [...new Map(result.map(v => [v.title, v])).values()]
         return result;
@@ -57,7 +59,7 @@ async function getResults(email) {
         // )
         const queryURI = encodeURI(email);
         var results = {
-            "name": '',
+            "relatedName": '',
             "otherRelatedNames": '',
             "emails": email
         }
@@ -104,7 +106,7 @@ async function checkForNamesAndTitles(dataFromPage, email) {
 
     let otherNamesFound = newArray(allNamesFromFirstResult, allNamesFromLinkedIn, allNamesFromTwitter)
     return {
-        "name": nameFound || '',
+        "relatedName":  nameFound || '',
         "otherRelatedNames": otherNamesFound || '',
         "emails": email
     }
