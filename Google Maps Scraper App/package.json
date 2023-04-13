@@ -9,10 +9,12 @@
   "author": "Ishfaq Ahmed",
   "license": "ISC",
   "dependencies": {
+    "compromise": "^14.8.2",
     "libphonenumber-js": "^1.10.26",
     "puppeteer": "^19.8.5",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "random-useragent": "^0.5.0",
     "sheetjs-style": "^0.15.8",
     "xlsx": "^0.18.5"
   }

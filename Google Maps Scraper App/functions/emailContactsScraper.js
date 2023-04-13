@@ -1,9 +1,18 @@
 const puppeteer = require("puppeteer");
 const parsePhoneNumber = require('libphonenumber-js')
-const { performance } = require('perf_hooks');
+const randomUseragent = require('random-useragent');
+
 //User provided constants 
 const MAX_CHILD_NODES = 1; //the number of child urls to scrape for data
-const excludeEmails = ['@sentry-next.wixpress.com', '@sentry.wixpress.com', '@sentry.io', '.png']
+const contactTypePage = ["contacts", "contact", "contact-us", "contactUs", "contact-Us", "contact_us"]
+const excludeEmails = [
+    "@sentry-next.wixpress.com",
+    "@sentry.wixpress.com",
+    "@sentry.io",
+    ".png",
+    ".jpg",
+    "@keen.io"
+]
 
 
 class DataMatch {
@@ -14,7 +23,8 @@ class DataMatch {
         this.regexp = _regExp;
         this.matchArray = [];
         this.featureData = [];
-        this.headers = { allData: _displayName, refinedData1: [_displayName, "Other " + _displayName + " Found"] };
+        // this.headers = { allData: _displayName, refinedData1: [_displayName, "Other" + _displayName + " Found"] };
+        // this.headers = { allData: _displayName, refinedData1: [_name, "Other" + _displayName + "Found"] };
     }
     getExtractedData(_data) {
         var extractedDataArray = [];
@@ -52,7 +62,7 @@ class DataMatch {
                     if (this.name == 'emails') {
                         for (let i = 0; i < extractedDataArray.length; i++) {
                             const email = extractedDataArray[i].toLowerCase().trim();
-                            if (exclude.some((domain) => email.includes(domain))) {
+                            if (excludeEmails.some((domain) => email.includes(domain))) {
                                 extractedDataArray.splice(i, 1);
                                 i--;
                             }
@@ -65,13 +75,6 @@ class DataMatch {
                 break;
         }
     }
-
-
-
-
-    // static setAllData(_data) {
-    //     allData.push(_data);
-    // }
 }
 //Initialising
 var childLinks = [];
@@ -93,24 +96,22 @@ const extractors = [
     }
 ]
 //adding style to header values by add header Name to all Data object
-exports.emailAndContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
+exports.emailContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
     var refinedData = [];
     const allData = [[]];
     var totalChildLinks = 0
     //create and style header
-    const allDataHeaderNames = [
-        'Root URL',
-        'Scraped URL',
-    ]
-    const refinedDataHeaderNames = [
-        "URL",
-    ]
-    extractors.forEach(extractor => {
-        allDataHeaderNames.push(extractor.dataMatch.headers.allData);
-        refinedDataHeaderNames.push(...extractor.dataMatch.headers.refinedData1);
-    })
-
-
+    // const allDataHeaderNames = [
+    //     'Root URL',
+    //     'Scraped URL',
+    // ]
+    // const refinedDataHeaderNames = [
+    //     "URL",
+    // ]
+    // extractors.forEach(extractor => {
+    //     allDataHeaderNames.push(extractor.dataMatch.headers.allData);
+    //     refinedDataHeaderNames.push(...extractor.dataMatch.headers.refinedData1);
+    // })
     for (let index = 0; index < ROOT_URLS_TO_SCRAPE.length; index++) {
 
         const rootUrl = ROOT_URLS_TO_SCRAPE[index];
@@ -133,10 +134,10 @@ exports.emailAndContactsScraper = async function (ROOT_URLS_TO_SCRAPE) {
 
     }
     await refineAllData(allData).then((data) => refinedData = data).catch((err) => {
-        console.error("\x1b[31mError refining enc scraped data!\x1b[37m")
+        console.error("\x1b[31mError refining enc scraped data!\x1b[37m", err)
     })
     // console.log("DataMatch.refinedData", refinedData)
-    console.log('Total URLs scraped for enc:', ROOT_URLS_TO_SCRAPE.length + totalChildLinks)
+    console.log(`Total websites scraped for Emails and Contacts: \x1b[33m${ROOT_URLS_TO_SCRAPE.length + totalChildLinks}\x1b[37m websites`)
     return refinedData
 
 }
@@ -159,23 +160,35 @@ async function autoScroll(page) {
     });
 }
 async function extractLinks(rootUrl, urlToScrape, linktype) {
-    const browser = await puppeteer.launch({ headless: false, ignoreHTTPSErrors: true });
+    const browser = await puppeteer.launch({
+        headless: false,
+        ignoreHTTPSErrors: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
     const page = await browser.newPage();
-
+    // await page.setUserAgent(
+    //     randomUseragent.getRandom(function (ua) {
+    //         return ua.folder === '/Browsers - Windows';
+    //     })
+    // )
+    //minimise the browser
     const session = await page.target().createCDPSession();
-    const {windowId} = await session.send('Browser.getWindowForTarget');
-    await session.send('Browser.setWindowBounds', {windowId, bounds: {windowState: 'minimized'}});
+    const { windowId } = await session.send('Browser.getWindowForTarget');
+    await session.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'minimized' } });
+
+
     const extractedData = {
         rootUrl: rootUrl,
         url: urlToScrape,
     }
     await page.goto(urlToScrape, {
         waitUntil: "domcontentloaded",
-    }).catch(err => console.error("\x1b[31mNot possible to scrape\x1b[37m", urlToScrape))
+    }).catch(err => console.error("\x1b[31mNot possible to scrape, problem with the website!\x1b[37m", urlToScrape))
     // page.waitForNetworkIdle({ idleTime: 1000 }),
     //scrolling to the bottom of the page 216s for 10 URLs with 2 Nodes in headless
     //scrolling to the bottom of the page 337s for 10 URLs with 2 Nodes in headful
     // await autoScroll(page)
+    await page.waitForTimeout(2000);
 
     try {
         //populate childlinks
@@ -187,7 +200,6 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
                 )
             );
 
-            const contactTypePage = ["contacts", 'contact', 'contact-us', 'contactUs', 'contact-Us', 'contact_us']
             const filteredHref = hrefs.filter((childUrl, index) => {
                 //filter out queryURL, '/' and /#sectionofpage and keep url type objects ie:"https://website.com/abcd" or 
                 //subdirectory type objects i.e:"/abcd" 
@@ -240,7 +252,7 @@ async function extractLinks(rootUrl, urlToScrape, linktype) {
         await browser.close();
 
     } catch (error) {
-        console.log('\x1b[31mThe browser timedout on\x1b[37m', rootUrl, error)
+        console.log(`\x1b[31mThe browser timedout while scraping \x1b[37m${rootUrl}\x1b[31m,either the website took \ntoo long to load or, please check your internet\x1b[37m`)
         await browser.close();
     }
     await browser.close();
@@ -277,7 +289,7 @@ async function refineAllData(allData) {
         }
         return acc
     }, [])
-    console.log("flattenedData", flattenedData);
+    // console.log("flattenedData", flattenedData);
     flattenedData.shift();
     flattenedData.forEach((data) => {
         const refinedDataInterface = {
@@ -286,11 +298,11 @@ async function refineAllData(allData) {
         extractors.forEach((extractor) => {
             const name = extractor.dataMatch.name;
             const displayName = extractor.dataMatch.displayName;
-            refinedDataInterface[displayName] = data[name][0] || '';
-            refinedDataInterface["Other" + displayName] = data[name].slice(1).toString();
+            refinedDataInterface[name] = data[name] ? data[name][0] : '';
+            refinedDataInterface[`other${displayName.replace('\s', '')}`] = data[name] ? data[name].slice(1).toString() : '';
         })
         refinedData.push(refinedDataInterface);
     })
-    return refinedData;
     // console.log("refinedData", refinedData);
+    return refinedData;
 }

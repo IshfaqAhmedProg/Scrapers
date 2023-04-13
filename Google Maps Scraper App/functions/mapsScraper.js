@@ -4,10 +4,9 @@ const { performance } = require('perf_hooks')
 puppeteer.use(StealthPlugin());
 
 
-exports.scrapeGoogleMaps = async function (request) {
+exports.mapsScraper = async function (request) {
   try {
-    console.log(`\n\x1b[37mStarted scraping Google Maps for ${request.country}, ${request.state}, ${request.city}, Please wait...\x1b[37m`);
-    var sTime = performance.now();
+
     const result = []
     for (let index = 0; index < request.keywords.length; index++) {
       const keyword = request.keywords[index];
@@ -17,8 +16,7 @@ exports.scrapeGoogleMaps = async function (request) {
       })
     }
     const dedupedResult = [...new Map(result.map(v => [v.title, v])).values()]
-    var eTime = performance.now()
-    console.log("\x1b[32m" + `Done scraping Google Maps for ${request.city}! TTC:${eTime - sTime}ms`)
+
     return dedupedResult;
   } catch (error) {
     console.log(error)
@@ -44,8 +42,8 @@ async function scrollPage(page, scrollContainer) {
   }
 }
 
-async function fillDataFromPage(page) {
-  const dataFromPage = await page.evaluate(() => {
+async function fillDataFromPage(page, query) {
+  const dataFromPage = await page.evaluate((query) => {
     return Array.from(document.querySelectorAll(".bfdHYd")).map((el) => {
       const placeUrl = el.parentElement.querySelector(".hfpxzc")
         ? el.parentElement.querySelector(".hfpxzc").getAttribute("href")
@@ -61,7 +59,8 @@ async function fillDataFromPage(page) {
       const longitude = [...placeUrl.matchAll(urlPattern)].map(
         ({ groups }) => groups.longitude
       )[0];
-      return {
+      const pageDetails = {
+        query,
         title: el.querySelector(".qBF1Pd")
           ? el.querySelector(".qBF1Pd").textContent.trim()
           : "",
@@ -139,35 +138,45 @@ async function fillDataFromPage(page) {
         placeUrl,
         dataId,
       };
+      return pageDetails
     });
-  });
+  }, query);
   return dataFromPage;
 }
 
 async function getLocalPlacesInfo(query, coordinates, hl = "en") {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  const page = await browser.newPage();
-  const queryURI = encodeURI(query);
-  const URL = `http://google.com/maps/search/${queryURI}/${coordinates}?hl=${hl}`;
-  // await page.setDefaultNavigationTimeout(60000);
-  await page.goto(URL);
+  try {
+    const browser = await puppeteer.launch({
+      headless: false,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+    const queryURI = encodeURI(query);
+    const URL = `http://google.com/maps/search/${queryURI}/${coordinates}?hl=${hl}`;
+    // await page.setDefaultNavigationTimeout(60000);
+    await page.goto(URL);
 
-  await page.waitForNavigation();
+    await page.waitForNavigation();
 
-  const scrollContainer = ".m6QErb[aria-label]";
+    const scrollContainer = ".m6QErb[aria-label]";
 
-  const localPlacesInfo = [];
+    const localPlacesInfo = [];
 
-  await page.waitForTimeout(2000);
+    await page.waitForTimeout(2000);
 
-  await scrollPage(page, scrollContainer);
-  localPlacesInfo.push(...(await fillDataFromPage(page)));
+    await scrollPage(page, scrollContainer);
+    localPlacesInfo.push(...(await fillDataFromPage(page, query)));
 
-  await browser.close();
+    await browser.close();
 
-  return localPlacesInfo;
+    return localPlacesInfo;
+  } catch (err) {
+    // if (err instanceof TimeoutError) {
+    // throw new Error('Please check your internet, or check if you are getting recaptcha when visiting google websites. If you are then change your IP address!')
+    // }
+    // else{  
+    console.log()
+    // }
+  }
 }
 
