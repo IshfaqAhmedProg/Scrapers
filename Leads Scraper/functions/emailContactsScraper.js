@@ -1,6 +1,5 @@
 const puppeteer = require("puppeteer");
 const parsePhoneNumber = require('libphonenumber-js')
-const randomUseragent = require('random-useragent');
 
 //User provided constants 
 const MAX_CHILD_NODES = 1; //the number of child urls to scrape for data
@@ -162,7 +161,6 @@ async function autoScroll(page) {
 async function extractLinks(rootUrl, urlToScrape, linktype) {
     const browser = await puppeteer.launch({
         headless: false,
-        ignoreHTTPSErrors: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
     const page = await browser.newPage();
